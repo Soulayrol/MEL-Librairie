@@ -1,0 +1,2 @@
+source "C:/Program Files/Autodesk/Maya2018/scripts/Librairie/Script/librairie.mel";
+Librairie();
