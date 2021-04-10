@@ -1,0 +1,156 @@
+//
+//
+// Librairie by Soulayrol Sylvain
+//
+//
+//
+// Choisir l'emplacement des fichiers sauvegardes
+global string $filePath = "C:/Program Files/Autodesk/Maya2018/scripts/Librairie/Files/";
+global string $rowColumnLayout;
+global string $scrollLayout;
+global string $recherche;
+
+//**********************************************
+//
+// Gestion et affichage
+//
+//**********************************************
+global proc Librairie()
+{
+    // Gestion fenetre
+    string $windowTitle = "Librairie";
+    string $win = "librairieUI";
+    string $dockName = "librairieDock";
+    global string $scrollLayout;
+    global string $rowColumnLayout;
+    global string $recherche;
+    $rowColumnLayout = "";
+
+    if (`window -exists $win`)
+         deleteUI $win;
+    if(`dockControl -exists $dockName`)
+        deleteUI $dockName;
+
+    window -width 210 -sizeable true -title $windowTitle $win;
+    columnLayout; // Main layout
+    
+    // Recherche
+    $recherche = `textField `;
+    textField -edit -pht "Rechercher" -searchField -width 210 -cc "rechercher()" $recherche;
+    
+    // Affichage Mesh
+    global string $scrollLayout;
+    $scrollLayout = `scrollLayout
+        -horizontalScrollBarThickness 0
+        -verticalScrollBarThickness 18
+        -width 210`;
+    // Lecture mesh
+    rechercher(); 
+    
+    setParent ..;
+    rowLayout -nc 3 -columnWidth 1 210
+              -columnAlign 1 "center";
+    // Bt sauvegarder
+    button -label "sauvegarder" -command "sauvegarder" ;
+
+    showWindow $win;
+
+    // Dock system
+    dockControl -area "left"
+                -content $win
+                -floating true
+                -allowedArea "left"
+                -allowedArea "right"
+                -allowedArea "top"
+                -allowedArea "bottom"
+                -label $windowTitle
+                $dockName;
+}
+
+
+//**********************************************
+//
+// Procedures
+//
+//**********************************************
+
+//***********************
+// Parcour et affiche les fichiers enregistres
+//***********************
+global proc rechercher(){
+    global string $filePath;
+    global string $rowColumnLayout;
+    global string $scrollLayout;
+    global string $recherche;
+    // On recupere la valeur a chercher
+    string $val = `textField -q -text $recherche`;
+
+    // Suppression de l'ancienne recherche puis creation
+    if($rowColumnLayout != ""){ deleteUI $rowColumnLayout; }
+    $rowColumnLayout = `rowColumnLayout -numberOfColumns 2 -width 210 -parent $scrollLayout`;
+
+    string $fileList[] = `getFileList -fld $filePath -fs "*.ma"`; // on recupere tous les fichier .ma
+    // Parcour des fichier .ma
+    for ($y=0;$y<size($fileList);$y++) {
+        if(match($val, $fileList[$y]) == $val){
+            $fileName = `substring $fileList[$y] 1 (size($fileList[$y])-3)`; // Suppression du .ma
+            $image = $filePath+$fileName+"_tmp.png"; // Chemain de l'image corespondante
+            //iconTextButton -style "iconAndTextVertical" -image1 $image -parent $rowColumnLayout -label $fileName -w 100 -h 100 -dcc ("importer(\"" + $fileName + "\")");// Affichage 
+
+            iconTextButton -style "iconAndTextVertical" -image1 $image -parent $rowColumnLayout -label $fileName -w 100 -h 100 -dcc ("importer(\"" + $fileName + "\")");
+                popupMenu -button 3;
+                    menuItem -l "Supprimer" -command ("supprimer(\"" + $fileName + "\")");
+        }
+    }
+    setParent ..;
+}
+//***********************
+// Sauvegarde l'objet selection? (en .ma)
+//***********************
+global proc sauvegarder() {
+    // Boite de dialogue nomage
+    string $result = `promptDialog
+        -title "Rename Object"
+        -message "Enter Name:"
+        -button "OK" -button "Cancel"
+        -defaultButton "OK" -cancelButton "Cancel"
+        -dismissString "Cancel"`;
+    // Sauvegarde
+    if ($result == "OK") {
+        string $fileName = `promptDialog -query -text`;
+        if($fileName != "") {
+            global string $filePath;
+            $meshPath = $filePath+$fileName+".ma";
+            file -force -options "v=0;" -typ "mayaAscii" -pr -es $meshPath;
+
+            // Render image screenshot
+            $imagePath = $filePath+$fileName;
+            setAttr -type "string" "defaultRenderGlobals.imageFilePrefix" $imagePath;
+            setAttr "defaultRenderGlobals.imageFormat" 32;
+            setAttr "hardwareRenderGlobals.enableAcceleratedMultiSampling" 0;
+            setAttr "hardwareRenderGlobals.enableHighQualityLighting" 0;
+            hwRender -w 100 -h 100 -currentFrame -camera "persp" -eaa 0 1 -renderSelected;  
+        }
+        else{ print ("*** Le nom du fichier ne doit pas etre null ! ***\n"); }
+    }  
+}
+//***********************
+// Importation dans la scene du fichier selectione
+//***********************
+global proc importer(string $fileName){
+    global string $filePath;
+    $mesh = $filePath + $fileName + ".ma";
+    print($mesh);
+    file -import -type "mayaAscii"  -ignoreVersion -ra true -mergeNamespacesOnClash false -pr  -importTimeRange "combine" $mesh;
+}
+//***********************
+// Suppression de l'objet selectione
+//***********************
+global proc supprimer(string $fileName){
+    global string $filePath;
+    $mesh = $filePath + $fileName + ".ma";
+    string $image = ($filePath + $fileName + "_tmp.png");
+    sysFile -delete $mesh;
+    sysFile -delete $image;
+    print($mesh +" & " + $image + " supprimer ! \n");
+}
